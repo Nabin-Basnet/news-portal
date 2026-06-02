@@ -35,7 +35,8 @@ class User(AbstractUser):
     role = models.ForeignKey(
         Role,
         on_delete=models.PROTECT,
-        related_name='users'
+        related_name='users',
+        null=True,
     )
 
     email = models.EmailField(
@@ -162,3 +163,4 @@ class PasswordResetToken(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - Password Reset"
+    
