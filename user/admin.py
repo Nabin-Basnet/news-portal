@@ -1,5 +1,5 @@
 from django.contrib import admin
-from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from .models import User, Role, RefreshToken, PasswordResetToken
 
 
@@ -43,13 +43,12 @@ class UserAdmin(admin.ModelAdmin):
     
     def verification_badge(self, obj):
         if obj.is_verified:
-            return format_html(
+            return mark_safe(
                 '<span style="color: green; font-weight: bold;">✓ Verified</span>'
             )
-        return format_html(
+        return mark_safe(
             '<span style="color: red; font-weight: bold;">✗ Unverified</span>'
         )
-    verification_badge.short_description = 'Verification Status'
 
 
 @admin.register(RefreshToken)
