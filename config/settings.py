@@ -37,8 +37,12 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'drf_spectacular',
+    'django_filters',
     'user',
     'News_management',
+    'articles',
 ]
 
 MIDDLEWARE = [
@@ -118,3 +122,56 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+
+# Media files configuration
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
+# Django REST Framework Configuration
+REST_FRAMEWORK = {
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# Swagger/OpenAPI Configuration
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'User Management API',
+    'DESCRIPTION': '''A comprehensive REST API for user management with JWT authentication.
+    
+## Authentication Endpoints
+- **Login** - POST /api/token/
+- **Refresh Token** - POST /api/token/refresh/
+- **Sign Up** - POST /api/users/
+- **Logout** - POST /api/users/logout/
+
+## How to Use
+1. Sign up: POST /api/users/ with email, password, username
+2. Login: POST /api/token/ with username and password to get access_token
+3. Use access_token in Authorization header: Bearer <access_token>
+4. Refresh token: POST /api/token/refresh/ with refresh_token
+5. Logout: POST /api/users/logout/ to revoke tokens
+    ''',
+    'VERSION': '1.0.0',
+    'SERVE_PERMISSIONS': ['rest_framework.permissions.AllowAny'],
+    'AUTHENTICATION_WHITELIST': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'SPECTACULAR_DEFAULTS': {
+        'SCHEMA_PATH_PREFIX': '/api/',
+    },
+}
+
+# Default Primary Key field type
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
