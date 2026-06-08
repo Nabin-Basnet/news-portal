@@ -27,7 +27,7 @@ SECRET_KEY = 'django-insecure-evie#o3wx$8by4o+xw2_+j&rc+gph$wzvgj_235%&94e^+7nm1
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['news-portal-hvgs.onrender.com', 'localhost', '127.0.0.1']
+ALLOWED_HOSTS = ['news-portal-hvgs.onrender.com', 'localhost']
 
 
 # Application definition
