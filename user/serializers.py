@@ -29,7 +29,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'username', 'email', 'first_name', 'last_name',
+            'id', 'email', 'first_name', 'last_name',
             'password', 'password2', 'bio', 'role', 'created_at'
         ]
         read_only_fields = ['id', 'created_at']
@@ -60,7 +60,7 @@ class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'username', 'email', 'first_name', 'last_name',
+            'id', 'email', 'first_name', 'last_name',
             'bio', 'profile_pic', 'role', 'role_id', 'is_verified',
             'is_active', 'created_at', 'updated_at'
         ]
@@ -78,7 +78,7 @@ class UserDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
-            'id', 'username', 'email', 'first_name', 'last_name',
+            'id', 'email', 'first_name', 'last_name',
             'bio', 'profile_pic', 'role', 'is_verified', 'is_active',
             'created_at', 'updated_at', 'refresh_tokens_count'
         ]

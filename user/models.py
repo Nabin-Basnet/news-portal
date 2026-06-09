@@ -1,8 +1,32 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
+from django.contrib.auth.models import BaseUserManager
 
+class UserManager(BaseUserManager):
 
+    def create_user(self, email, password=None, **extra_fields):
+        if not email:
+            raise ValueError("Email is required")
+
+        email = self.normalize_email(email)
+        user = self.model(email=email, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, password=None, **extra_fields):
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("is_active", True)
+
+        if extra_fields.get("is_staff") is not True:
+            raise ValueError("Superuser must have is_staff=True")
+
+        if extra_fields.get("is_superuser") is not True:
+            raise ValueError("Superuser must have is_superuser=True")
+
+        return self.create_user(email, password, **extra_fields)
 class Role(models.Model):
     """
     User roles:
@@ -31,6 +55,10 @@ class User(AbstractUser):
     Custom User Model
     Login using email instead of username.
     """
+
+    # Remove username field inherited from AbstractUser
+    username = None
+    objects = UserManager() 
 
     role = models.ForeignKey(
         Role,
@@ -67,14 +95,20 @@ class User(AbstractUser):
         auto_now=True
     )
 
+    # Authentication settings
     USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
+    REQUIRED_FIELDS = []
 
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
-        return self.email
+        full_name = f"{self.first_name} {self.last_name}".strip()
+        return full_name if full_name else self.email
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}".strip()
 
 
 class RefreshToken(models.Model):
@@ -163,4 +197,3 @@ class PasswordResetToken(models.Model):
 
     def __str__(self):
         return f"{self.user.email} - Password Reset"
-    

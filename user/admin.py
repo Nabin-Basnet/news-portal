@@ -18,16 +18,16 @@ class RoleAdmin(admin.ModelAdmin):
 @admin.register(User)
 class UserAdmin(admin.ModelAdmin):
     list_display = [
-        'id', 'email', 'username', 'first_name', 'last_name',
+        'id', 'email', 'first_name', 'last_name',
         'role', 'verification_badge', 'is_active', 'created_at'
     ]
     list_filter = ['is_active', 'is_verified', 'role', 'created_at']
-    search_fields = ['email', 'username', 'first_name', 'last_name']
+    search_fields = ['email', 'first_name', 'last_name']
     readonly_fields = ['created_at', 'updated_at']
     
     fieldsets = (
         ('Account Information', {
-            'fields': ('username', 'email', 'password')
+            'fields': ( 'email', 'password')
         }),
         ('Personal Information', {
             'fields': ('first_name', 'last_name', 'bio', 'profile_pic')

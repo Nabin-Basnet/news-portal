@@ -119,8 +119,8 @@ class UserViewSet(viewsets.ModelViewSet):
         filters.OrderingFilter
     ]
     filterset_fields = ['role', 'is_verified', 'is_active']
-    search_fields = ['username', 'email', 'first_name', 'last_name']
-    ordering_fields = ['created_at', 'username', 'email']
+    search_fields = [ 'email', 'first_name', 'last_name']
+    ordering_fields = ['created_at', 'email']
     ordering = ['-created_at']
     
     def get_serializer_class(self):
