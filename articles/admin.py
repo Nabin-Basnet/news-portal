@@ -33,7 +33,11 @@ class ArticleAdmin(admin.ModelAdmin):
     def image_thumbnail(self, obj):
         if obj.image:
             return format_html('<img src="{}" style="height: 45px; width: auto; border-radius: 4px; object-fit: cover;" />', obj.image.url)
-        return format_html('<span style="color: #999; font-style: italic;">No Image</span>')
+        return format_html(
+    '<span style="color: {}; font-style: italic;">{}</span>',
+    '#999',
+    'No Image'
+)
     image_thumbnail.short_description = "Preview"
 
     def derived_display_name(self, obj):
