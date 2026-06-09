@@ -4,64 +4,55 @@ from .views import CategoryViewSet, ArticleViewSet, UserInteractionViewSet
 
 app_name = "articles"
 
-# Router endpoints
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet, basename='category')
 
 urlpatterns = [
-    # Category Router
+    # Router Endpoints (Handles category routing dynamically)
     path("", include(router.urls)),
 
     # =========================
     # DASHBOARDS & WORKFLOWS
     # =========================
-
     path(
         "admin/activity/",
         ArticleViewSet.as_view({"get": "admin_activity_dashboard"}),
         name="admin_activity_dashboard",
     ),
-
     path(
         "reporter/articles/",
         ArticleViewSet.as_view({"get": "list_reporter_articles"}),
-        name="list_reporter_articles",
+        name="reporter_articles",
     ),
-
     path(
         "pending/",
         ArticleViewSet.as_view({"get": "list_pending_articles"}),
-        name="list_pending_articles",
+        name="pending_articles",
     ),
 
     # =========================
     # PUBLIC ARTICLE FEEDS
     # =========================
-
     path(
-        "",
+        "feed/",
         ArticleViewSet.as_view({"get": "list"}),
         name="list_published_articles",
     ),
-
     path(
         "trending/",
         ArticleViewSet.as_view({"get": "trending"}),
         name="trending_articles",
     ),
-
     path(
         "news-of-the-day/",
         ArticleViewSet.as_view({"get": "news_of_the_day"}),
         name="news_of_the_day",
     ),
-
     path(
         "search/",
         ArticleViewSet.as_view({"get": "search_feed"}),
-        name="search_articles",
+        name="search_feed",
     ),
-
     path(
         "tag/<slug:tag_slug>/",
         ArticleViewSet.as_view({"get": "articles_by_tag"}),
@@ -69,32 +60,29 @@ urlpatterns = [
     ),
 
     # =========================
-    # ARTICLE CRUD
+    # ARTICLE CRUD (Using standardized pk lookup)
     # =========================
-
     path(
         "create/",
         ArticleViewSet.as_view({"post": "create"}),
         name="create_article",
     ),
-
     path(
         "<int:pk>/",
         ArticleViewSet.as_view({"get": "retrieve"}),
         name="article_detail",
     ),
-
     path(
         "<int:pk>/update/",
         ArticleViewSet.as_view(
             {
                 "put": "update",
                 "patch": "partial_update",
+                "post": "partial_update",
             }
         ),
         name="update_article",
     ),
-
     path(
         "<int:pk>/delete/",
         ArticleViewSet.as_view({"delete": "destroy"}),
@@ -104,13 +92,11 @@ urlpatterns = [
     # =========================
     # ARTICLE WORKFLOW
     # =========================
-
     path(
         "<int:pk>/submit/",
         ArticleViewSet.as_view({"post": "submit"}),
         name="submit_article",
     ),
-
     path(
         "<int:pk>/review/",
         ArticleViewSet.as_view({"post": "review"}),
@@ -118,47 +104,32 @@ urlpatterns = [
     ),
 
     # =========================
-    # COMMENTS
+    # USER INTERACTIONS & COMMENTS
     # =========================
-
     path(
-        "<int:pk>/comments/",
-        ArticleViewSet.as_view({"get": "retrieve"}),
-        name="list_comments",
-    ),
-
-    path(
-        "<int:pk>/comments/add/",
-        ArticleViewSet.as_view({"post": "retrieve"}),
+        "<int:pk>/comment/",
+        ArticleViewSet.as_view({"post": "add_comment"}),
         name="add_comment",
     ),
-
-    # =========================
-    # USER INTERACTIONS
-    # =========================
-
     path(
         "<int:pk>/react/",
         ArticleViewSet.as_view({"post": "toggle_reaction"}),
         name="toggle_reaction",
     ),
-
     path(
         "<int:pk>/bookmark/",
         ArticleViewSet.as_view({"post": "toggle_bookmark"}),
         name="toggle_bookmark",
     ),
-
     path(
         "my-bookmarks/",
         UserInteractionViewSet.as_view({"get": "user_bookmarks"}),
-        name="user_bookmarks",
+        name="my_bookmarks",
     ),
 
     # =========================
     # CATEGORY MANAGEMENT
     # =========================
-
     path(
         "categories/create/",
         CategoryViewSet.as_view({"post": "create"}),

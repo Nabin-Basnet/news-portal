@@ -1,5 +1,6 @@
-from django.contrib import admin, messages  # FIXED: Imported core framework messaging logs
+from django.contrib import admin, messages
 from django.utils import timezone
+from django.utils.html import format_html  # 🟢 CRITICAL: Imported HTML formatter
 from .models import Category, Tag, Article, Comment, Reaction, Bookmark, ArticleView
 
 
@@ -19,12 +20,25 @@ class TagAdmin(admin.ModelAdmin):
 
 @admin.register(Article)
 class ArticleAdmin(admin.ModelAdmin):
-    list_display = ("title", "author", "category", "status", "created_at", "published_at")
+    # 🟢 FIXED: Added 'image_thumbnail' to the front of the list
+    list_display = ("image_thumbnail", "title", "author", "derived_display_name", "category", "status", "created_at", "published_at")
     list_filter = ("status", "category", "created_at")
-    search_fields = ("title", "body", "author__email", "category__name")
+    search_fields = ("title", "body", "author__email", "category__name", "author_name")
     prepopulated_fields = {"slug": ("title",)}
     
+    fields = ["title", "slug", "body", "image", "category", "tags", "author", "status", "review_note"]
     actions = ["bulk_approve_articles", "bulk_reject_articles"]
+
+    # 🟢 FIXED: Added the HTML rendering method inside ArticleAdmin
+    def image_thumbnail(self, obj):
+        if obj.image:
+            return format_html('<img src="{}" style="height: 45px; width: auto; border-radius: 4px; object-fit: cover;" />', obj.image.url)
+        return format_html('<span style="color: #999; font-style: italic;">No Image</span>')
+    image_thumbnail.short_description = "Preview"
+
+    def derived_display_name(self, obj):
+        return obj.author_name or "Not Generated"
+    derived_display_name.short_description = "Cached Author Name"
 
     def get_queryset(self, request):
         """
@@ -56,23 +70,25 @@ class ArticleAdmin(admin.ModelAdmin):
         user = request.user
         role_name = getattr(user.role, 'role_name', '').lower() if hasattr(user, 'role') else ''
 
-        # FIXED: Explicitly allow Editors and Admins to modify status and review notes
         if user.is_superuser or role_name in ['editor', 'admin']:
             return base_readonly
             
-        # Authors and base users are locked out from updating lifecycle stages manually
         return base_readonly + ["status", "review_note"]
 
     def save_model(self, request, obj, form, change):
-        """
-        Automatically sets the author field when an author creates an article.
-        """
-        if not change or not obj.author:
-            user = request.user
-            role_name = getattr(user.role, 'role_name', '').lower() if hasattr(user, 'role') else ''
-            if role_name == 'author':
-                obj.author = user
-                obj.author_name = f"{user.first_name} {user.last_name}".strip() or user.email
+        user = request.user
+        role_name = getattr(user.role, 'role_name', '').lower() if hasattr(user, 'role') else ''
+
+        if role_name == 'author' and not user.is_superuser:
+            obj.author = user
+        elif not obj.author:
+            obj.author = user
+
+        if obj.author:
+            target_user = obj.author
+            full_name = f"{target_user.first_name} {target_user.last_name}".strip()
+            obj.author_name = full_name or target_user.username or target_user.email
+
         super().save_model(request, obj, form, change)
 
     # --- Custom Workflow Actions ---
@@ -83,7 +99,6 @@ class ArticleAdmin(admin.ModelAdmin):
         role_name = getattr(user.role, 'role_name', '').lower() if hasattr(user, 'role') else ''
         
         if role_name not in ['editor', 'admin'] and not user.is_superuser:
-            # FIXED: Converted level back into core message tag objects
             self.message_user(request, "You do not have permission to approve articles.", level=messages.ERROR)
             return
 
@@ -100,7 +115,6 @@ class ArticleAdmin(admin.ModelAdmin):
         role_name = getattr(user.role, 'role_name', '').lower() if hasattr(user, 'role') else ''
         
         if role_name not in ['editor', 'admin'] and not user.is_superuser:
-            # FIXED: Converted level back into core message tag objects
             self.message_user(request, "You do not have permission to reject articles.", level=messages.ERROR)
             return
 
