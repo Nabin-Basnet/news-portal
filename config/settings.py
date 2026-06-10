@@ -78,8 +78,15 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database Setup
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': 'news-portal-db',
+        'USER': 'neondb_owner',
+        'PASSWORD': 'npg_KzR4si9fWhmC',
+        'HOST': 'ep-falling-bread-apsh43n1-pooler.c-7.us-east-1.aws.neon.tech',
+        'PORT': '5432',
+        'OPTIONS': {
+            'sslmode': 'require',
+        },
     }
 }
 
