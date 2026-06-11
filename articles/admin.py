@@ -29,15 +29,11 @@ class ArticleAdmin(admin.ModelAdmin):
     fields = ["title", "slug", "body", "image", "category", "tags", "author", "status", "review_note"]
     actions = ["bulk_approve_articles", "bulk_reject_articles"]
 
-    # 🟢 FIXED: Added the HTML rendering method inside ArticleAdmin
+    # 🟢 FIXED: Resolved merge conflict cleanly here
     def image_thumbnail(self, obj):
         if obj.image:
             return format_html('<img src="{}" style="height: 45px; width: auto; border-radius: 4px; object-fit: cover;" />', obj.image.url)
-        return format_html(
-    '<span style="color: {}; font-style: italic;">{}</span>',
-    '#999',
-    'No Image'
-)
+        return format_html('<span style="color: #999; font-style: italic;">No Image</span>')
     image_thumbnail.short_description = "Preview"
 
     def derived_display_name(self, obj):
