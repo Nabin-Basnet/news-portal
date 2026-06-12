@@ -3,7 +3,10 @@ from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
 
+from cloudinary.models import CloudinaryField
 
+
+# ---------------- CATEGORY ----------------
 class Category(models.Model):
     name = models.CharField(max_length=100, unique=True)
     slug = models.SlugField(unique=True, blank=True)
@@ -21,39 +24,45 @@ class Category(models.Model):
         super().save(*args, **kwargs)
 
 
+# ---------------- TAG ----------------
 class Tag(models.Model):
     name = models.CharField(max_length=50, unique=True)
     slug = models.SlugField(max_length=50, unique=True, blank=True)
+
+    def __str__(self):
+        return f"#{self.name}"
 
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
         super().save(*args, **kwargs)
 
-    def __str__(self):
-        return f"#{self.name}"
 
-
+# ---------------- ARTICLE QUERYSET ----------------
 class ArticleQuerySet(models.QuerySet):
     def published(self):
         return self.filter(status="published")
 
 
+# ---------------- ARTICLE ----------------
 class Article(models.Model):
+
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
         PENDING_REVIEW = "pending_review", "Pending Review"
         PUBLISHED = "published", "Published"
         REJECTED = "rejected", "Rejected"
 
-    # Core Content
+    # Core content
     title = models.CharField(max_length=255, db_index=True)
     slug = models.SlugField(unique=True, max_length=300, blank=True)
     summary = models.TextField(max_length=500, blank=True)
     body = models.TextField()
-    image = models.ImageField(upload_to="article_images/", null=True, blank=True)
-    
-    # Workflow Roles
+
+    # ✅ CLOUDINARY IMAGE FIELD (FIXED)
+    image = CloudinaryField("image", null=True, blank=True)
+
+    # Workflow
     author = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -62,7 +71,7 @@ class Article(models.Model):
         blank=True,
     )
     author_name = models.CharField(max_length=255, blank=True)
-    
+
     reviewer = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -70,24 +79,25 @@ class Article(models.Model):
         null=True,
         blank=True,
     )
-    
-    # Status & Feedback
+
+    # Status
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
         default=Status.DRAFT,
         db_index=True,
     )
+
     review_note = models.TextField(blank=True)
-    
-    # Metadata Timestamps
+
+    # timestamps
     submitted_at = models.DateTimeField(null=True, blank=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
     published_at = models.DateTimeField(null=True, blank=True, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    
-    # Classifications
+
+    # classification
     category = models.ForeignKey(
         Category,
         on_delete=models.SET_NULL,
@@ -95,6 +105,7 @@ class Article(models.Model):
         blank=True,
         related_name="articles"
     )
+
     tags = models.ManyToManyField(Tag, blank=True, related_name="articles")
 
     objects = ArticleQuerySet.as_manager()
@@ -105,37 +116,30 @@ class Article(models.Model):
     def __str__(self):
         return self.title
 
-    @property
-    def view_count(self):
-        return self.views.count()
-
-    @property
-    def comment_count(self):
-        return self.comments.count()
-
-    # 🟢 FIXED: Safe, comprehensive database interceptor save method
+    # ---------------- SAFE SAVE ----------------
     def save(self, *args, **kwargs):
-        # 1. Handle auto slugification
+
         if not self.slug:
             self.slug = slugify(self.title)
 
-        # 2. Maintain author name backup fallback if a user model instance is attached
         if self.author and not self.author_name:
             full_name = f"{self.author.first_name} {self.author.last_name}".strip()
             self.author_name = full_name or self.author.username or self.author.email
 
-        # 3. Intercept `update_fields` from Django Admin to avoid stripping out image changes
         if "update_fields" in kwargs and kwargs["update_fields"] is not None:
-            kwargs["update_fields"] = set(kwargs["update_fields"])
-            kwargs["update_fields"].add("slug")
-            if self.author_name:
-                kwargs["update_fields"].add("author_name")
-            if "image" in kwargs["update_fields"]:
-                kwargs["update_fields"].add("image")
+            update_fields = list(kwargs["update_fields"])
+
+            if "slug" not in update_fields:
+                update_fields.append("slug")
+
+            if self.author_name and "author_name" not in update_fields:
+                update_fields.append("author_name")
+
+            kwargs["update_fields"] = update_fields
 
         super().save(*args, **kwargs)
 
-    # Workflow Actions
+    # ---------------- WORKFLOW ----------------
     def submit_for_review(self):
         self.status = self.Status.PENDING_REVIEW
         self.submitted_at = timezone.now()
@@ -147,60 +151,58 @@ class Article(models.Model):
         self.reviewer = reviewer
         self.reviewed_at = now
         self.published_at = now
-        self.save(
-            update_fields=[
-                "status",
-                "reviewer",
-                "reviewed_at",
-                "published_at",
-                "updated_at",
-            ]
-        )
+        self.save(update_fields=[
+            "status",
+            "reviewer",
+            "reviewed_at",
+            "published_at",
+            "updated_at",
+        ])
 
     def reject(self, reviewer, note=""):
         self.status = self.Status.REJECTED
         self.reviewer = reviewer
         self.reviewed_at = timezone.now()
         self.review_note = note
-        self.save(
-            update_fields=[
-                "status",
-                "reviewer",
-                "reviewed_at",
-                "review_note",
-                "updated_at",
-            ]
-        )
+        self.save(update_fields=[
+            "status",
+            "reviewer",
+            "reviewed_at",
+            "review_note",
+            "updated_at",
+        ])
 
 
+# ---------------- COMMENT ----------------
 class Comment(models.Model):
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="comments")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="comments")
     content = models.TextField()
+
     parent = models.ForeignKey(
-        'self', 
-        on_delete=models.CASCADE, 
-        null=True, 
-        blank=True, 
+        "self",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
         related_name="replies"
     )
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["created_at"]
-        indexes = [
-            models.Index(fields=["article", "created_at"]),
-        ]
 
     def __str__(self):
-        return f"Comment by {self.user.username} on {self.article.title}"
-    
+        username = getattr(self.user, "username", "unknown")
+        return f"Comment by {username}"
+
     @property
     def is_reply(self):
         return self.parent is not None
 
 
+# ---------------- REACTION ----------------
 class Reaction(models.Model):
     class ReactionType(models.TextChoices):
         LIKE = "like", "Like"
@@ -210,36 +212,30 @@ class Reaction(models.Model):
 
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="reactions")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="article_reactions")
-    reaction = models.CharField(
-        max_length=10,
-        choices=ReactionType.choices,
-        default=ReactionType.LIKE
-    )
+    reaction = models.CharField(max_length=10, choices=ReactionType.choices, default=ReactionType.LIKE)
     reacted_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('article', 'user')
-        indexes = [
-            models.Index(fields=["article", "reaction"]),
-        ]
+        unique_together = ("article", "user")
 
     def __str__(self):
-        return f"{self.user.username} reacted {self.get_reaction_display()} to {self.article.title}"  
+        return f"{self.user.username} reacted {self.reaction}"
 
 
+# ---------------- BOOKMARK ----------------
 class Bookmark(models.Model):
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="bookmarks")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="article_bookmarks")
     bookmarked_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-bookmarked_at"]
-        unique_together = ('article', 'user')
+        unique_together = ("article", "user")
 
     def __str__(self):
         return f"{self.user.username} bookmarked {self.article.title}"
 
 
+# ---------------- VIEW ----------------
 class ArticleView(models.Model):
     article = models.ForeignKey(Article, on_delete=models.CASCADE, related_name="views")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="article_views")
@@ -247,12 +243,7 @@ class ArticleView(models.Model):
     viewed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        ordering = ["-viewed_at"]
-        unique_together = ('article', 'user', 'ip_address')
-        indexes = [
-            models.Index(fields=["article"]),
-            models.Index(fields=["viewed_at"]),
-        ]
+        unique_together = ("article", "user", "ip_address")
 
     def __str__(self):
-        return f"{self.user.username} viewed {self.article.title} from {self.ip_address}"
+        return f"{self.user.username} viewed {self.article.title}"
