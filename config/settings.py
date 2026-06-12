@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-evie#o3wx$8by4o+xw2_+j&rc+gph$wzvgj_235%&94e^+7nm1'
 
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [
     "news-portal-hvgs.onrender.com",
