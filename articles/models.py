@@ -124,7 +124,7 @@ class Article(models.Model):
 
         if self.author and not self.author_name:
             full_name = f"{self.author.first_name} {self.author.last_name}".strip()
-            self.author_name = full_name or self.author.username or self.author.email
+            self.author_name = full_name or self.author.email
 
         if "update_fields" in kwargs and kwargs["update_fields"] is not None:
             update_fields = list(kwargs["update_fields"])
@@ -194,8 +194,7 @@ class Comment(models.Model):
         ordering = ["created_at"]
 
     def __str__(self):
-        username = getattr(self.user, "username", "unknown")
-        return f"Comment by {username}"
+        return f"Comment by {self.user.email}"
 
     @property
     def is_reply(self):
@@ -219,7 +218,7 @@ class Reaction(models.Model):
         unique_together = ("article", "user")
 
     def __str__(self):
-        return f"{self.user.username} reacted {self.reaction}"
+        return f"{self.user.email} reacted {self.reaction}"
 
 
 # ---------------- BOOKMARK ----------------
@@ -232,7 +231,7 @@ class Bookmark(models.Model):
         unique_together = ("article", "user")
 
     def __str__(self):
-        return f"{self.user.username} bookmarked {self.article.title}"
+        return f"{self.user.email} bookmarked {self.article.title}"
 
 
 # ---------------- VIEW ----------------
@@ -246,4 +245,4 @@ class ArticleView(models.Model):
         unique_together = ("article", "user", "ip_address")
 
     def __str__(self):
-        return f"{self.user.username} viewed {self.article.title}"
+        return f"{self.user.email} viewed {self.article.title}"

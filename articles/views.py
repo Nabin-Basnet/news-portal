@@ -8,6 +8,7 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.authentication import SessionAuthentication
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from .models import (
     Article, ArticleView, Reaction, Bookmark, Comment, Category, Tag
@@ -35,7 +36,7 @@ from .utils import get_role
 # CATEGORY VIEWSET
 # ======================================================
 class CategoryViewSet(viewsets.ModelViewSet):
-    authentication_classes = [SessionAuthentication]
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
 
@@ -60,9 +61,9 @@ class CategoryViewSet(viewsets.ModelViewSet):
 # ARTICLE VIEWSET
 # ======================================================
 class ArticleViewSet(viewsets.ModelViewSet):
-    authentication_classes = [SessionAuthentication]
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
     queryset = Article.objects.all()
-    lookup_url_kwarg = "article_id"
+    lookup_url_kwarg = "pk"
 
     # ---------------- SERIALIZER ----------------
     def get_serializer_class(self):
@@ -138,7 +139,7 @@ class ArticleViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         article = get_object_or_404(
             Article,
-            id=kwargs['article_id'],
+            id=kwargs[self.lookup_url_kwarg],
             status=Article.Status.PUBLISHED
         )
 
@@ -200,7 +201,7 @@ class ArticleViewSet(viewsets.ModelViewSet):
 
     # ---------------- SUBMIT ----------------
     @action(detail=True, methods=['post'])
-    def submit(self, request, article_id=None):
+    def submit(self, request, pk=None):
         article = self._get_article_from_url()
 
         if article.author_id != request.user.id:
@@ -214,7 +215,7 @@ class ArticleViewSet(viewsets.ModelViewSet):
 
     # ---------------- REVIEW ----------------
     @action(detail=True, methods=['post'])
-    def review(self, request, article_id=None):
+    def review(self, request, pk=None):
         article = self._get_article_from_url()
         action_name = request.data.get("action")
 
@@ -233,7 +234,7 @@ class ArticleViewSet(viewsets.ModelViewSet):
 
     # ---------------- COMMENT ----------------
     @action(detail=True, methods=['post'])
-    def add_comment(self, request, article_id=None):
+    def add_comment(self, request, pk=None):
         article = self._get_article_from_url()
         content = request.data.get("content", "").strip()
         parent_id = request.data.get("parent_id")
@@ -262,7 +263,7 @@ class ArticleViewSet(viewsets.ModelViewSet):
 
     # ---------------- REACTION ----------------
     @action(detail=True, methods=['post'])
-    def toggle_reaction(self, request, article_id=None):
+    def toggle_reaction(self, request, pk=None):
         article = self._get_article_from_url()
         reaction_type = request.data.get("reaction_type") or request.data.get("reaction")
 
@@ -292,7 +293,7 @@ class ArticleViewSet(viewsets.ModelViewSet):
 
     # ---------------- BOOKMARK ----------------
     @action(detail=True, methods=['post'])
-    def toggle_bookmark(self, request, article_id=None):
+    def toggle_bookmark(self, request, pk=None):
         article = self._get_article_from_url()
         bookmark = Bookmark.objects.filter(article=article, user=request.user).first()
 
@@ -399,7 +400,7 @@ class ArticleViewSet(viewsets.ModelViewSet):
 # USER INTERACTION VIEWSET
 # ======================================================
 class UserInteractionViewSet(viewsets.ViewSet):
-    authentication_classes = [SessionAuthentication]
+    authentication_classes = [JWTAuthentication, SessionAuthentication]
     permission_classes = [permissions.IsAuthenticated]
 
     @action(detail=False, methods=['get'], url_path='bookmarks')

@@ -24,7 +24,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('user.urls')),
 
-    path('/articles/', include('articles.urls', namespace='articles')),
+    path('articles/', include('articles.urls', namespace='articles')),
     path('api/ads/', include('ads.urls')),
 
     # Swagger/OpenAPI URLs
