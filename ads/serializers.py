@@ -20,12 +20,9 @@ class AdvertisementSerializer(serializers.ModelSerializer):
 
     # 🟢 Business Logic Validation (Looks amazing to senior reviewers)
     def validate(self, data):
-        """
-        Ensures that if an ad is flagged as a sponsored article,
-        a valid cross-referenced target Article ID must be provided.
-        """
-        is_sponsored = data.get('is_sponsored_article', False)
-        sponsored_id = data.get('sponsored_article_id')
+        # 1. Check incoming data, or fall back to the existing instance values if updating
+        is_sponsored = data.get('is_sponsored_article', getattr(self.instance, 'is_sponsored_article', False))
+        sponsored_id = data.get('sponsored_article_id', getattr(self.instance, 'sponsored_article_id', None))
 
         if is_sponsored and not sponsored_id:
             raise serializers.ValidationError({
