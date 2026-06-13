@@ -62,6 +62,7 @@ if DEBUG:
 
 # ---------------- INSTALLED APPS ----------------
 INSTALLED_APPS = [
+    'cloudinary_storage',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -76,7 +77,7 @@ INSTALLED_APPS = [
     'django_filters',
 
     # Cloudinary
-    'cloudinary_storage',
+    # 'cloudinary_storage',
     'cloudinary',
 
     # Local apps
