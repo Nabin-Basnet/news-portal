@@ -201,13 +201,15 @@ if not DEBUG and not all(CLOUDINARY_STORAGE.values()):
     raise ImproperlyConfigured("Cloudinary credentials must be set in production.")
 
 # ---------------- STORAGES CONFIGURATION ----------------
+# ---------------- STORAGES CONFIGURATION ----------------
 STORAGES = {
     "default": {
         "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
     },
     "staticfiles": {
-        # Switch to standard Django static storage to prevent WhiteNoise compression errors
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        # This tells Django to use WhiteNoise to serve static files seamlessly 
+        # at runtime without triggering the strict build-time compression errors.
+        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
 }
 
