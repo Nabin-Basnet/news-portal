@@ -62,7 +62,7 @@ if DEBUG:
 
 # ---------------- INSTALLED APPS ----------------
 INSTALLED_APPS = [
-    'cloudinary_storage',
+    # 'cloudinary_storage',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -87,7 +87,6 @@ INSTALLED_APPS = [
     'ads',
 ]
 
-# ---------------- MIDDLEWARE ----------------
 # ---------------- MIDDLEWARE ----------------
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -167,13 +166,10 @@ USE_I18N = True
 USE_TZ = True
 
 # ---------------- STATIC / MEDIA ----------------
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
-# Required for cloudinary-storage compatibility
-STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
-
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 # ---------------- CLOUDINARY ----------------
 import cloudinary
@@ -211,6 +207,7 @@ STORAGES = {
         "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
     },
 }
+
 # ---------------- REST FRAMEWORK ----------------
 REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
