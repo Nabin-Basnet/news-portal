@@ -88,9 +88,9 @@ INSTALLED_APPS = [
 ]
 
 # ---------------- MIDDLEWARE ----------------
+# ---------------- MIDDLEWARE ----------------
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
 
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -168,11 +168,12 @@ USE_TZ = True
 # ---------------- STATIC / MEDIA ----------------
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+
+# Required for cloudinary-storage compatibility
+STATICFILES_STORAGE = "django.contrib.staticfiles.storage.StaticFilesStorage"
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-
 # ---------------- CLOUDINARY ----------------
 import cloudinary
 import cloudinary.uploader
@@ -200,12 +201,12 @@ if not DEBUG and not all(CLOUDINARY_STORAGE.values()):
     raise ImproperlyConfigured("Cloudinary credentials must be set in production.")
 
 # ---------------- STORAGES CONFIGURATION ----------------
+
 STORAGES = {
     "default": {
         "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
     },
     "staticfiles": {
-        # Switch to standard Django static storage to prevent WhiteNoise compression errors
         "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
