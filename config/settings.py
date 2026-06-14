@@ -89,9 +89,8 @@ INSTALLED_APPS = [
 
 # ---------------- MIDDLEWARE ----------------
 MIDDLEWARE = [
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.security.SecurityMiddleware',
-    # 'whitenoise.middleware.WhiteNoiseMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 
     'django.contrib.sessions.middleware.SessionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
@@ -169,7 +168,7 @@ USE_TZ = True
 # ---------------- STATIC / MEDIA ----------------
 STATIC_URL = 'static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -201,15 +200,13 @@ if not DEBUG and not all(CLOUDINARY_STORAGE.values()):
     raise ImproperlyConfigured("Cloudinary credentials must be set in production.")
 
 # ---------------- STORAGES CONFIGURATION ----------------
-# ---------------- STORAGES CONFIGURATION ----------------
 STORAGES = {
     "default": {
         "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
     },
     "staticfiles": {
-        # This tells Django to use WhiteNoise to serve static files seamlessly 
-        # at runtime without triggering the strict build-time compression errors.
-        "BACKEND": "whitenoise.storage.CompressedStaticFilesStorage",
+        # Switch to standard Django static storage to prevent WhiteNoise compression errors
+        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
     },
 }
 
