@@ -205,13 +205,12 @@ if not DEBUG and not all(CLOUDINARY_STORAGE.values()):
 
 STORAGES = {
     "default": {
-        "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
     },
     "staticfiles": {
-        "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },
 }
-
 # ---------------- REST FRAMEWORK ----------------
 REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': [
