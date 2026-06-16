@@ -82,7 +82,6 @@ INSTALLED_APPS = [
 
     # Local apps
     'user',
-    'News_management',
     'articles',
     'ads',
 ]
