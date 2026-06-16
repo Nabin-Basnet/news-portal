@@ -87,7 +87,7 @@ class ArticleAdmin(admin.ModelAdmin):
         if obj.author:
             target_user = obj.author
             full_name = f"{target_user.first_name} {target_user.last_name}".strip()
-            obj.author_name = full_name or target_user.username or target_user.email
+            obj.author_name = full_name or target_user.email
 
         super().save_model(request, obj, form, change)
 
