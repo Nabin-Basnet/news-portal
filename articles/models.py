@@ -2,6 +2,9 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from django.utils.text import slugify
+from django.db import models
+from django.conf import settings
+from notifications.services import send_article_notification
 
 from cloudinary.models import CloudinaryField
 
@@ -147,10 +150,12 @@ class Article(models.Model):
 
     def approve(self, reviewer):
         now = timezone.now()
+
         self.status = self.Status.PUBLISHED
         self.reviewer = reviewer
         self.reviewed_at = now
         self.published_at = now
+
         self.save(update_fields=[
             "status",
             "reviewer",
@@ -159,6 +164,9 @@ class Article(models.Model):
             "updated_at",
         ])
 
+        # Send notification after publishing
+        send_article_notification(self)
+    
     def reject(self, reviewer, note=""):
         self.status = self.Status.REJECTED
         self.reviewer = reviewer
