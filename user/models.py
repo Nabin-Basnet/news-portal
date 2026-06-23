@@ -57,7 +57,6 @@ class User(AbstractUser):
     """
 
     # Remove username field inherited from AbstractUser
-    email_notifications = models.BooleanField(default=True)
     username = None
     objects = UserManager() 
 
