@@ -59,7 +59,7 @@ class Article(models.Model):
     summary = models.TextField(max_length=500, blank=True)
     body = models.TextField()
 
-    # ✅ CLOUDINARY IMAGE FIELD (FIXED)
+    
     image = CloudinaryField("image", null=True, blank=True)
 
     # Workflow
@@ -246,3 +246,5 @@ class ArticleView(models.Model):
 
     def __str__(self):
         return f"{self.user.email} viewed {self.article.title}"
+
+
