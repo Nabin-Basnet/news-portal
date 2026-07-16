@@ -22,7 +22,7 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
     )
     password2 = serializers.CharField(
         write_only=True,
-        required=True
+        required=False
     )
     role = RoleSerializer(read_only=True)
     
@@ -35,7 +35,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'created_at']
     
     def validate(self, data):
-        if data['password'] != data.pop('password2'):
+        password_confirmation = data.pop('password2', None)
+        if password_confirmation is not None and data['password'] != password_confirmation:
             raise serializers.ValidationError(
                 {"password": "Passwords don't match."}
             )
