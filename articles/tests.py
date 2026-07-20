@@ -11,10 +11,10 @@ User = get_user_model()
 class ArticlePermissionTests(TestCase):
     def setUp(self):
         # Setting up roles to match domain logic
-        self.author_role = Role.objects.create(role_name="Author")
-        self.editor_role = Role.objects.create(role_name="Editor")
-        self.admin_role = Role.objects.create(role_name="Admin")
-        self.user_role = Role.objects.create(role_name="User")
+        self.author_role, _ = Role.objects.get_or_create(role_name="Reporter")
+        self.editor_role, _ = Role.objects.get_or_create(role_name="Editor")
+        self.admin_role, _ = Role.objects.get_or_create(role_name="Admin")
+        self.user_role, _ = Role.objects.get_or_create(role_name="User")
 
         self.reporter = User.objects.create_user(
             username="rep1",
@@ -46,7 +46,7 @@ class ArticlePermissionTests(TestCase):
         )
 
     def test_guest_cannot_comment(self):
-        url = reverse("articles:add_comment", kwargs={"article_id": self.article.id})
+        url = reverse("articles:add_comment", kwargs={"pk": self.article.id})
         response = self.client.post(
             url,
             data=json.dumps({"content": "hello"}),
@@ -71,16 +71,16 @@ class ArticlePermissionTests(TestCase):
         )
         self.client.force_login(user)
 
-        detail_url = reverse("articles:article_detail", kwargs={"article_id": self.article.id})
+        detail_url = reverse("articles:article_detail", kwargs={"pk": self.article.id})
         response = self.client.get(detail_url)
         
         # Verify the detail view returns a clean response before tracking metrics
         self.assertEqual(response.status_code, 200)
         self.assertEqual(ArticleView.objects.filter(article=self.article, user=user).count(), 1)
 
-        comment_url = reverse("articles:add_comment", kwargs={"article_id": self.article.id})
-        react_url = reverse("articles:toggle_reaction", kwargs={"article_id": self.article.id})
-        bookmark_url = reverse("articles:toggle_bookmark", kwargs={"article_id": self.article.id})
+        comment_url = reverse("articles:add_comment", kwargs={"pk": self.article.id})
+        react_url = reverse("articles:toggle_reaction", kwargs={"pk": self.article.id})
+        bookmark_url = reverse("articles:toggle_bookmark", kwargs={"pk": self.article.id})
 
         self.client.post(comment_url, data=json.dumps({"content": "Nice"}), content_type="application/json")
         self.client.post(react_url, data=json.dumps({"reaction_type": "like"}), content_type="application/json")
@@ -92,16 +92,22 @@ class ArticlePermissionTests(TestCase):
 
     def test_editor_can_approve_pending_article(self):
         self.client.force_login(self.reporter)
-        submit_url = reverse("articles:submit_article", kwargs={"article_id": self.article.id})
+        submit_url = reverse("articles:submit_article", kwargs={"pk": self.article.id})
         submit_response = self.client.post(submit_url)
         self.assertEqual(submit_response.status_code, 200)
         
         self.article.refresh_from_db()
-        self.assertEqual(self.article.status, Article.Status.PENDING_REVIEW if hasattr(Article, 'Status') else self.article.status)
+        self.assertEqual(self.article.status, Article.Status.SUBMITTED)
 
         self.client.logout()
         self.client.force_login(self.editor)
-        review_url = reverse("articles:review_article", kwargs={"article_id": self.article.id})
+        review_url = reverse("articles:review_article", kwargs={"pk": self.article.id})
+        start_review_response = self.client.post(
+            review_url,
+            data=json.dumps({"action": "start_review"}),
+            content_type="application/json",
+        )
+        self.assertEqual(start_review_response.status_code, 200)
         review_response = self.client.post(
             review_url,
             data=json.dumps({"action": "approve"}),
@@ -110,9 +116,9 @@ class ArticlePermissionTests(TestCase):
         self.assertEqual(review_response.status_code, 200)
 
         self.article.refresh_from_db()
-        self.assertEqual(self.article.status, Article.Status.PUBLISHED if hasattr(Article, 'Status') else self.article.status)
+        self.assertEqual(self.article.status, Article.Status.APPROVED)
 
-    def test_editor_cannot_create_article(self):
+    def test_editor_can_create_article(self):
         self.client.force_login(self.editor)
         create_url = reverse("articles:create_article")
         response = self.client.post(
@@ -120,9 +126,9 @@ class ArticlePermissionTests(TestCase):
             data=json.dumps({"title": "x", "body": "y"}),
             content_type="application/json",
         )
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 201)
 
-    def test_reporter_can_create_article_with_new_category_name(self):
+    def test_reporter_cannot_create_category_with_article(self):
         self.client.force_login(self.reporter)
         create_url = reverse("articles:create_article")
         response = self.client.post(
@@ -131,24 +137,20 @@ class ArticlePermissionTests(TestCase):
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 201)
-        article = Article.objects.get(id=response.json()["id"])
-        self.assertEqual(article.category.name, "Sports")
-        self.assertEqual(article.category.slug, "sports")
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Category.objects.filter(slug="sports").exists())
 
-    def test_reporter_update_article_can_create_category_from_name(self):
+    def test_reporter_cannot_create_category_when_updating_article(self):
         self.client.force_login(self.reporter)
-        update_url = reverse("articles:update_article", kwargs={"article_id": self.article.id})
+        update_url = reverse("articles:update_article", kwargs={"pk": self.article.id})
         response = self.client.post(
             update_url,
             data=json.dumps({"title": "Movie news", "body": "Cinema story", "category_name": "Movies"}),
             content_type="application/json",
         )
 
-        self.assertEqual(response.status_code, 200)
-        self.article.refresh_from_db()
-        self.assertEqual(self.article.category.name, "Movies")
-        self.assertEqual(Category.objects.filter(slug="movies").count(), 1)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Category.objects.filter(slug="movies").exists())
 
     def test_admin_can_view_activity_dashboard(self):
         category = Category.objects.create(name="Sports", slug="sports")

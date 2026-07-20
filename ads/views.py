@@ -6,6 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Advertisement, AdImpression, AdClick
 from .serializers import AdvertisementSerializer, AdInteractionSerializer
+from user.permissions import IsAdminRole
 
 class AdvertisementViewSet(viewsets.ModelViewSet):
     queryset = Advertisement.objects.all()
@@ -16,7 +17,7 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
         if self.action in ['list', 'track_impression', 'track_click', 'trending']:
             return [permissions.AllowAny()]
         # Full CRUD operations (POST, PUT, DELETE) restricted to Admins
-        return [permissions.IsAdminUser()]
+        return [IsAdminRole()]
 
     def get_active_queryset(self):
         """

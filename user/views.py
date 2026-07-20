@@ -16,7 +16,9 @@ from .serializers import (
     RoleSerializer,
     RefreshTokenSerializer,
     PasswordResetTokenSerializer,
+    UserProfileSerializer,
 )
+from .permissions import IsAdminRole, IsSelfOrAdmin
 
 
 @extend_schema_view(
@@ -62,6 +64,7 @@ class RoleViewSet(viewsets.ModelViewSet):
     search_fields = ['role_name']
     ordering_fields = ['role_name', 'created_at']
     ordering = ['role_name']
+    permission_classes = [IsAdminRole]
 
 
 @extend_schema_view(
@@ -127,8 +130,10 @@ class UserViewSet(viewsets.ModelViewSet):
         """Use different serializers for different actions."""
         if self.action == 'create':
             return UserRegistrationSerializer
-        elif self.action == 'retrieve':
+        elif self.action in ('retrieve', 'me'):
             return UserDetailSerializer
+        elif self.action in ('update', 'partial_update') and not self.request.user.is_superuser and self.kwargs.get('pk') == str(self.request.user.pk):
+            return UserProfileSerializer
         elif self.action == 'change_password':
             return ChangePasswordSerializer
         return UserSerializer
@@ -137,8 +142,12 @@ class UserViewSet(viewsets.ModelViewSet):
         """Set permissions based on action."""
         if self.action == 'create':
             permission_classes = [AllowAny]
-        elif self.action in ['list', 'retrieve']:
-            permission_classes = [IsAuthenticated]
+        elif self.action == 'list':
+            permission_classes = [IsAdminRole]
+        elif self.action in ['retrieve', 'update', 'partial_update', 'destroy']:
+            permission_classes = [IsSelfOrAdmin]
+        elif self.action == 'set_role':
+            permission_classes = [IsAdminRole]
         else:
             permission_classes = [IsAuthenticated]
         return [permission() for permission in permission_classes]

@@ -1,11 +1,12 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import CategoryViewSet, ArticleViewSet, UserInteractionViewSet
+from .views import CategoryViewSet, TagViewSet, ArticleViewSet, UserInteractionViewSet
 
 app_name = "articles"
 
 router = DefaultRouter()
 router.register(r'categories', CategoryViewSet, basename='category')
+router.register(r'tags', TagViewSet, basename='tag')
 
 urlpatterns = [
     # Router (Handles category routing dynamically)
@@ -15,6 +16,7 @@ urlpatterns = [
     path("admin/activity/", ArticleViewSet.as_view({"get": "admin_activity_dashboard"}), name="admin_activity_dashboard"),
     path("reporter/articles/", ArticleViewSet.as_view({"get": "list_reporter_articles"}), name="reporter_articles"),
     path("pending/", ArticleViewSet.as_view({"get": "list_pending_articles"}), name="pending_articles"),
+    path("drafts/", ArticleViewSet.as_view({"get": "list_draft_articles"}), name="draft_articles"),
 
     # PUBLIC FEEDS
     path("feed/", ArticleViewSet.as_view({"get": "list"}), name="list_published_articles"),
@@ -36,6 +38,12 @@ urlpatterns = [
     # ARTICLE WORKFLOW
     path("<int:pk>/submit/", ArticleViewSet.as_view({"post": "submit"}), name="submit_article"),
     path("<int:pk>/review/", ArticleViewSet.as_view({"post": "review"}), name="review_article"),
+    path("<int:pk>/start-review/", ArticleViewSet.as_view({"post": "start_review"}), name="start_review_article"),
+    path("<int:pk>/approve/", ArticleViewSet.as_view({"post": "approve"}), name="approve_article"),
+    path("<int:pk>/reject/", ArticleViewSet.as_view({"post": "reject"}), name="reject_article"),
+    path("<int:pk>/request-revision/", ArticleViewSet.as_view({"post": "request_revision"}), name="request_revision_article"),
+    path("<int:pk>/publish/", ArticleViewSet.as_view({"post": "publish"}), name="publish_article"),
+    path("<int:pk>/archive/", ArticleViewSet.as_view({"post": "archive"}), name="archive_article"),
 
     # USER INTERACTIONS & COMMENTS
     path("<int:pk>/comment/", ArticleViewSet.as_view({"post": "add_comment"}), name="add_comment"),

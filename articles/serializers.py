@@ -83,13 +83,16 @@ class ArticleWriteSerializer(serializers.ModelSerializer):
                 parsed_id = None
 
         if parsed_id:
-            instance.category = Category.objects.filter(id=parsed_id).first()
+            category = Category.objects.filter(id=parsed_id).first()
+            if not category:
+                raise serializers.ValidationError({"category_id": "Category not found."})
+            instance.category = category
         elif category_name and str(category_name).strip():
             name = str(category_name).strip()
-            slug = slugify(name)
-            if slug:
-                category, _ = Category.objects.get_or_create(slug=slug, defaults={"name": name})
-                instance.category = category
+            category = Category.objects.filter(slug=slugify(name)).first()
+            if not category:
+                raise serializers.ValidationError({"category_name": "Category not found. Create it through the category API."})
+            instance.category = category
         elif category_id == "" or category_id is None:
             # Clear field explicitly if user requests removal
             instance.category = None

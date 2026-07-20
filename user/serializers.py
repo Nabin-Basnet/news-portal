@@ -43,7 +43,10 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return data
     
     def create(self, validated_data):
-        user = User.objects.create_user(**validated_data)
+        # Public registration always creates a reader account.  Privileged
+        # roles are assigned only through the admin-only role endpoint.
+        reader_role, _ = Role.objects.get_or_create(role_name='User')
+        user = User.objects.create_user(role=reader_role, **validated_data)
         return user
 
 
@@ -65,6 +68,16 @@ class UserSerializer(serializers.ModelSerializer):
             'bio', 'profile_pic', 'role', 'role_id', 'is_verified',
             'is_active', 'created_at', 'updated_at'
         ]
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    """Safe serializer for a user editing their own profile."""
+    role = RoleSerializer(read_only=True)
+
+    class Meta:
+        model = User
+        fields = ['id', 'email', 'first_name', 'last_name', 'bio', 'profile_pic', 'role', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'role', 'created_at', 'updated_at']
         read_only_fields = [
             'id', 'is_verified', 'created_at', 'updated_at'
         ]

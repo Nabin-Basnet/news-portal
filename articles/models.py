@@ -49,9 +49,12 @@ class Article(models.Model):
 
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
-        PENDING_REVIEW = "pending_review", "Pending Review"
+        SUBMITTED = "submitted", "Submitted"
+        UNDER_REVIEW = "under_review", "Under Review"
+        APPROVED = "approved", "Approved"
         PUBLISHED = "published", "Published"
         REJECTED = "rejected", "Rejected"
+        ARCHIVED = "archived", "Archived"
 
     # Core content
     title = models.CharField(max_length=255, db_index=True)
@@ -141,25 +144,57 @@ class Article(models.Model):
 
     # ---------------- WORKFLOW ----------------
     def submit_for_review(self):
-        self.status = self.Status.PENDING_REVIEW
+        if self.status not in (self.Status.DRAFT, self.Status.REJECTED):
+            raise ValueError("Only draft or rejected articles can be submitted.")
+        self.status = self.Status.SUBMITTED
         self.submitted_at = timezone.now()
         self.save(update_fields=["status", "submitted_at", "updated_at"])
 
     def approve(self, reviewer):
-        now = timezone.now()
-        self.status = self.Status.PUBLISHED
+        if self.status != self.Status.UNDER_REVIEW:
+            raise ValueError("Only articles under review can be approved.")
+        self.status = self.Status.APPROVED
         self.reviewer = reviewer
-        self.reviewed_at = now
-        self.published_at = now
+        self.reviewed_at = timezone.now()
         self.save(update_fields=[
             "status",
             "reviewer",
             "reviewed_at",
-            "published_at",
             "updated_at",
         ])
 
+    def start_review(self, reviewer):
+        if self.status != self.Status.SUBMITTED:
+            raise ValueError("Only submitted articles can be moved to review.")
+        self.status = self.Status.UNDER_REVIEW
+        self.reviewer = reviewer
+        self.reviewed_at = timezone.now()
+        self.save(update_fields=["status", "reviewer", "reviewed_at", "updated_at"])
+
+    def publish(self, reviewer):
+        if self.status != self.Status.APPROVED:
+            raise ValueError("Only approved articles can be published.")
+        now = timezone.now()
+        self.status = self.Status.PUBLISHED
+        self.reviewer = reviewer
+        self.published_at = now
+        self.save(update_fields=["status", "reviewer", "published_at", "updated_at"])
+
+    def request_revision(self, reviewer, note=""):
+        self.status = self.Status.DRAFT
+        self.reviewer = reviewer
+        self.reviewed_at = timezone.now()
+        self.review_note = note
+        self.save(update_fields=["status", "reviewer", "reviewed_at", "review_note", "updated_at"])
+
+    def archive(self, reviewer):
+        self.status = self.Status.ARCHIVED
+        self.reviewer = reviewer
+        self.save(update_fields=["status", "reviewer", "updated_at"])
+
     def reject(self, reviewer, note=""):
+        if self.status not in (self.Status.SUBMITTED, self.Status.UNDER_REVIEW, self.Status.APPROVED):
+            raise ValueError("Only submitted or approved articles can be rejected.")
         self.status = self.Status.REJECTED
         self.reviewer = reviewer
         self.reviewed_at = timezone.now()
@@ -246,5 +281,3 @@ class ArticleView(models.Model):
 
     def __str__(self):
         return f"{self.user.email} viewed {self.article.title}"
-
-
