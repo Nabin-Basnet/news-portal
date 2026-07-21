@@ -9,6 +9,9 @@ router.register(r'categories', CategoryViewSet, basename='category')
 router.register(r'tags', TagViewSet, basename='tag')
 
 urlpatterns = [
+    # Main article CRUD entrypoint
+    path("", ArticleViewSet.as_view({"get": "list", "post": "create"}), name="article_list_create"),
+
     # Router (Handles category routing dynamically)
     path("", include(router.urls)),
 
@@ -47,7 +50,10 @@ urlpatterns = [
 
     # USER INTERACTIONS & COMMENTS
     path("<int:pk>/comment/", ArticleViewSet.as_view({"post": "add_comment"}), name="add_comment"),
+    path("<int:pk>/comments/", ArticleViewSet.as_view({"get": "comments", "post": "comments"}), name="article_comments"),
     path("<int:pk>/react/", ArticleViewSet.as_view({"post": "toggle_reaction"}), name="toggle_reaction"),
+    path("<int:pk>/reactions/", ArticleViewSet.as_view({"post": "toggle_reaction"}), name="article_reactions"),
     path("<int:pk>/bookmark/", ArticleViewSet.as_view({"post": "toggle_bookmark"}), name="toggle_bookmark"),
+    path("<int:pk>/bookmarks/", ArticleViewSet.as_view({"get": "bookmarks", "post": "bookmarks"}), name="article_bookmarks"),
     path("my-bookmarks/", UserInteractionViewSet.as_view({"get": "user_bookmarks"}), name="my_bookmarks"),
 ]

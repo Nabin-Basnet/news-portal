@@ -19,7 +19,9 @@ from .serializers import (
     TagSerializer,
     ArticleListSerializer,
     ArticleDetailSerializer,
-    ArticleWriteSerializer
+    ArticleWriteSerializer,
+    CommentSerializer,
+    ReactionSerializer,
 )
 
 from .permissions import (
@@ -131,6 +133,15 @@ class ArticleViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(author=self.request.user)
 
+    def _paginated_article_response(self, queryset, serializer_class, context=None):
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = serializer_class(page, many=True, context=context)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = serializer_class(queryset, many=True, context=context)
+        return Response({"count": queryset.count(), "results": serializer.data})
+
     # ---------------- DELETE ----------------
     def destroy(self, request, *args, **kwargs):
         article = self.get_object()
@@ -192,24 +203,20 @@ class ArticleViewSet(viewsets.ModelViewSet):
     # ---------------- REPORTER LIST ----------------
     @action(detail=False, methods=['get'])
     def list_reporter_articles(self, request):
-        articles = Article.objects.filter(author=request.user)
-        return Response({
-            "results": ArticleListSerializer(articles, many=True).data
-        })
+        articles = Article.objects.filter(author=request.user).order_by('-created_at')
+        return self._paginated_article_response(articles, ArticleListSerializer)
 
     # ---------------- PENDING LIST ----------------
     @action(detail=False, methods=['get'])
     def list_pending_articles(self, request):
-        articles = Article.objects.filter(status__in=[Article.Status.SUBMITTED, Article.Status.UNDER_REVIEW])
-        return Response({
-            "results": ArticleListSerializer(articles, many=True).data
-        })
+        articles = Article.objects.filter(status__in=[Article.Status.SUBMITTED, Article.Status.UNDER_REVIEW]).order_by('-created_at')
+        return self._paginated_article_response(articles, ArticleListSerializer)
 
     @action(detail=False, methods=['get'], url_path='drafts')
     def list_draft_articles(self, request):
         """Shared draft queue for Staff, Editors, and Admins."""
-        articles = Article.objects.filter(status=Article.Status.DRAFT)
-        return Response({"results": ArticleListSerializer(articles, many=True).data})
+        articles = Article.objects.filter(status=Article.Status.DRAFT).order_by('-created_at')
+        return self._paginated_article_response(articles, ArticleListSerializer)
 
     # ---------------- SUBMIT ----------------
     @action(detail=True, methods=['post'])
@@ -314,35 +321,39 @@ class ArticleViewSet(viewsets.ModelViewSet):
         return Response({"status": article.status})
 
     # ---------------- COMMENT ----------------
-    @action(detail=True, methods=['post'])
-    def add_comment(self, request, pk=None):
+    @action(detail=True, methods=['get', 'post'], url_path='comments')
+    def comments(self, request, pk=None):
         article = self._get_article_from_url()
+        if request.method == 'GET':
+            return Response(self._comments_tree(article))
+
         if article.status != Article.Status.PUBLISHED:
             return Response({"detail": "Comments are only available on published articles."}, status=status.HTTP_404_NOT_FOUND)
-        content = request.data.get("content", "").strip()
-        parent_id = request.data.get("parent_id")
-
-        if not content:
-            return Response(
-                {"detail": "Comment content is required."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        serializer = CommentSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         parent = None
+        parent_id = request.data.get("parent_id")
         if parent_id:
             parent = get_object_or_404(Comment, id=parent_id, article=article)
 
         comment = Comment.objects.create(
             article=article,
             user=request.user,
-            content=content,
+            content=serializer.validated_data['content'],
             parent=parent
         )
 
         return Response({
             "id": comment.id,
-            "content": comment.content
+            "content": comment.content,
+            "created_at": comment.created_at,
         }, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=['post'])
+    def add_comment(self, request, pk=None):
+        return self.comments(request, pk)
 
     # ---------------- REACTION ----------------
     @action(detail=True, methods=['post'])
@@ -350,14 +361,11 @@ class ArticleViewSet(viewsets.ModelViewSet):
         article = self._get_article_from_url()
         if article.status != Article.Status.PUBLISHED:
             return Response({"detail": "Reactions are only available on published articles."}, status=status.HTTP_404_NOT_FOUND)
-        reaction_type = request.data.get("reaction_type") or request.data.get("reaction")
+        serializer = ReactionSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
-        valid_reactions = {choice[0] for choice in Reaction.ReactionType.choices}
-        if reaction_type not in valid_reactions:
-            return Response(
-                {"detail": "Invalid reaction type."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
+        reaction_type = serializer.validated_data['reaction_type']
 
         reaction, created = Reaction.objects.get_or_create(
             article=article,
@@ -377,9 +385,13 @@ class ArticleViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
     # ---------------- BOOKMARK ----------------
-    @action(detail=True, methods=['post'])
-    def toggle_bookmark(self, request, pk=None):
+    @action(detail=True, methods=['get', 'post'], url_path='bookmarks')
+    def bookmarks(self, request, pk=None):
         article = self._get_article_from_url()
+        if request.method == 'GET':
+            bookmarked = Bookmark.objects.filter(article=article, user=request.user).exists()
+            return Response({"bookmarked": bookmarked})
+
         if article.status != Article.Status.PUBLISHED:
             return Response({"detail": "Bookmarks are only available on published articles."}, status=status.HTTP_404_NOT_FOUND)
         bookmark = Bookmark.objects.filter(article=article, user=request.user).first()
@@ -393,6 +405,10 @@ class ArticleViewSet(viewsets.ModelViewSet):
             {"bookmarked": True, "message": "Bookmarked"},
             status=status.HTTP_201_CREATED
         )
+
+    @action(detail=True, methods=['post'])
+    def toggle_bookmark(self, request, pk=None):
+        return self.bookmarks(request, pk)
 
     # ---------------- TRENDING ----------------
     @action(detail=False, methods=['get'])
@@ -420,9 +436,13 @@ class ArticleViewSet(viewsets.ModelViewSet):
         if cat:
             qs = qs.filter(category__slug=cat)
 
-        return Response({
-            "results": ArticleListSerializer(qs, many=True).data
-        })
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = ArticleListSerializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+
+        serializer = ArticleListSerializer(qs, many=True)
+        return Response({"count": qs.count(), "results": serializer.data})
 
     # ---------------- NEWS OF DAY ----------------
     @action(detail=False, methods=['get'])
@@ -458,10 +478,7 @@ class ArticleViewSet(viewsets.ModelViewSet):
             status=Article.Status.PUBLISHED
         )
 
-        return Response({
-            "tag": tag.name,
-            "results": ArticleListSerializer(articles, many=True).data
-        })
+        return self._paginated_article_response(articles, ArticleListSerializer, context={"request": request})
 
     # ---------------- ADMIN DASHBOARD ----------------
     @action(detail=False, methods=['get'])

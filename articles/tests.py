@@ -179,3 +179,28 @@ class ArticlePermissionTests(TestCase):
         activity_url = reverse("articles:admin_activity_dashboard")
         response = self.client.get(activity_url)
         self.assertEqual(response.status_code, 403)
+
+    def test_search_feed_returns_paginated_payload(self):
+        category = Category.objects.create(name="Technology", slug="technology")
+        Article.objects.create(
+            title="AI launch",
+            body="AI article body",
+            author=self.reporter,
+            category=category,
+            status=Article.Status.PUBLISHED,
+        )
+        Article.objects.create(
+            title="Another AI story",
+            body="More AI article body",
+            author=self.reporter,
+            category=category,
+            status=Article.Status.PUBLISHED,
+        )
+
+        response = self.client.get(reverse("articles:search_feed"), {"q": "ai"})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("count", payload)
+        self.assertIn("results", payload)
+        self.assertGreaterEqual(payload["count"], 1)

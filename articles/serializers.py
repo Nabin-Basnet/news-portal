@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.utils.text import slugify
 from .models import Category, Tag, Article, Comment, Reaction, Bookmark
 
+
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
@@ -27,7 +28,7 @@ class ArticleListSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Article
-        fields = ['id', 'title', 'published_at', 'category_name', 'category_slug', 'status']
+        fields = ['id', 'slug', 'title', 'summary', 'published_at', 'category_name', 'category_slug', 'status']
 
 
 class ArticleDetailSerializer(serializers.ModelSerializer):
@@ -43,7 +44,7 @@ class ArticleDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Article
         fields = [
-            'id', 'title', 'body', 'image', 'author_name', 'published_at',
+            'id', 'slug', 'title', 'summary', 'body', 'image', 'author_name', 'published_at',
             'tags', 'view_count', 'reactions_total', 'reactions_breakdown',
             'user_has_reacted', 'comments'
         ]
@@ -63,15 +64,44 @@ class ArticleDetailSerializer(serializers.ModelSerializer):
 
 
 class ArticleWriteSerializer(serializers.ModelSerializer):
-    # 🟢 Allow null or blank input types so multi-part form data doesn't trigger validation blockers
     category_id = serializers.CharField(write_only=True, required=False, allow_null=True, allow_blank=True)
     category_name = serializers.CharField(write_only=True, required=False, allow_blank=True, allow_null=True)
     image = serializers.ImageField(required=False, allow_null=True)
 
     class Meta:
         model = Article
-        fields = ['id', 'title', 'body', 'image', 'author_name', 'category_id', 'category_name', 'status']
+        fields = ['id', 'title', 'summary', 'body', 'image', 'author_name', 'category_id', 'category_name', 'status']
         read_only_fields = ['status']
+
+    def validate_title(self, value):
+        if not value or not str(value).strip():
+            raise serializers.ValidationError("Title is required.")
+        return value.strip()
+
+    def validate_body(self, value):
+        if not value or not str(value).strip():
+            raise serializers.ValidationError("Body is required.")
+        return value.strip()
+
+    def validate(self, attrs):
+        category_id = attrs.get('category_id')
+        category_name = attrs.get('category_name')
+
+        if category_id in (None, '', 'null'):
+            category_id = None
+
+        if category_id is not None and str(category_id).strip() != '':
+            try:
+                int(str(category_id))
+            except ValueError as exc:
+                raise serializers.ValidationError({'category_id': 'Category ID must be an integer.'}) from exc
+
+        if category_name and str(category_name).strip():
+            slug = slugify(str(category_name).strip())
+            if not Category.objects.filter(slug=slug).exists():
+                raise serializers.ValidationError({'category_name': 'Category not found. Create it through the category API.'})
+
+        return attrs
 
     def _assign_category(self, instance, category_id, category_name):
         # 🟢 Explicitly parse form data variations (integers vs strings vs empty text fields)
@@ -100,7 +130,7 @@ class ArticleWriteSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         category_id = validated_data.pop('category_id', None)
         category_name = validated_data.pop('category_name', None)
-        
+
         request = self.context.get('request')
         user = request.user if request else None
 
@@ -127,3 +157,19 @@ class ArticleWriteSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Comment
+        fields = ['id', 'content', 'parent', 'created_at']
+        read_only_fields = ['id', 'created_at', 'parent']
+
+    def validate_content(self, value):
+        if not value or not str(value).strip():
+            raise serializers.ValidationError('Comment content is required.')
+        return str(value).strip()
+
+
+class ReactionSerializer(serializers.Serializer):
+    reaction_type = serializers.ChoiceField(choices=[choice[0] for choice in Reaction.ReactionType.choices], required=True)
