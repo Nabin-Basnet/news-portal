@@ -9,6 +9,10 @@ class UserManager(BaseUserManager):
         if not email:
             raise ValueError("Email is required")
 
+        # Accounts are email-only, but accepting this legacy argument keeps
+        # older API clients and internal callers working after username was
+        # removed from the model.
+        extra_fields.pop("username", None)
         email = self.normalize_email(email)
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
@@ -85,6 +89,12 @@ class User(AbstractUser):
 
     is_verified = models.BooleanField(
         default=False
+    )
+
+    # Kept in the model because the production user table requires a value
+    # for this column when an account is created.
+    email_notifications = models.BooleanField(
+        default=True
     )
 
     created_at = models.DateTimeField(

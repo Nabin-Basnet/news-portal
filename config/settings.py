@@ -11,9 +11,22 @@ import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
 from dotenv import load_dotenv
 
-load_dotenv(override=True)
-
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Load the project's .env explicitly from BASE_DIR so variables are reliable
+load_dotenv(BASE_DIR / '.env', override=True)
+try:
+    print("[settings] BASE_DIR:", BASE_DIR)
+    env_path = BASE_DIR / '.env'
+    print("[settings] .env exists:", env_path.exists())
+    try:
+        with open(env_path, 'r') as f:
+            sample = ''.join(f.readlines()[:10])
+            print("[settings] .env sample:\n" + sample)
+    except Exception as e:
+        print("[settings] couldn't read .env:", e)
+except Exception:
+    pass
 
 
 def env_value(name, default=None):
@@ -48,8 +61,14 @@ def cloudinary_from_url():
 
 
 DEBUG = env_bool("DEBUG", False)
-
 SECRET_KEY = env_value("SECRET_KEY")
+
+# TEMP DEBUG: print values seen by the process (remove in production)
+try:
+    print("[settings] DEBUG env:", os.getenv("DEBUG"))
+    print("[settings] SECRET_KEY present:", bool(os.getenv("SECRET_KEY")))
+except Exception:
+    pass
 if not SECRET_KEY:
     if DEBUG:
         SECRET_KEY = "django-insecure-dev-only-change-me"

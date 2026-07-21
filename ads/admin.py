@@ -41,7 +41,10 @@ class AdvertisementAdmin(admin.ModelAdmin):
     def image_thumbnail(self, obj):
         if obj.image:
             return format_html('<img src="{}" style="height: 40px; width: auto; border-radius: 4px; border: 1px solid #ddd;" />', obj.image.url)
-        return format_html('<span style="color: #999; font-style: italic;">No Image</span>')
+        return format_html(
+            '<span style="color: #999; font-style: italic;">{}</span>',
+            'No Image',
+        )
     image_thumbnail.short_description = "Banner Preview"
 
     # Dynamic Aggregates Execution
