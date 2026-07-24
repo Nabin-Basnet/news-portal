@@ -6,7 +6,17 @@ from rest_framework.permissions import BasePermission
 def is_admin_role(user):
     return bool(
         user and user.is_authenticated and (
-            user.is_superuser or getattr(getattr(user, "role", None), "role_name", "").strip().lower() == "admin"
+            user.is_superuser or
+            getattr(getattr(user, "role", None), "role_name", "").strip().lower() == "admin"
+        )
+    )
+
+
+def is_admin_or_staff_role(user):
+    return bool(
+        user and user.is_authenticated and (
+            user.is_superuser or
+            getattr(getattr(user, "role", None), "role_name", "").strip().lower() in ["admin", "staff"]
         )
     )
 
@@ -14,6 +24,11 @@ def is_admin_role(user):
 class IsAdminRole(BasePermission):
     def has_permission(self, request, view):
         return is_admin_role(request.user)
+
+
+class IsAdminOrStaffRole(BasePermission):
+    def has_permission(self, request, view):
+        return is_admin_or_staff_role(request.user)
 
 
 class IsSelfOrAdmin(BasePermission):
