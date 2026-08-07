@@ -25,13 +25,16 @@ class AdvertisementAdmin(admin.ModelAdmin):
         "client_name", 
         "position", 
         "category",
+        "status",
+        "creator",
+        "reviewer",
         "is_active", 
         "is_sponsored_article", 
         "get_impressions", 
         "get_clicks", 
         "ctr_percentage"
     )
-    list_filter = ("position", "is_active", "category", "is_sponsored_article")
+    list_filter = ("status", "position", "is_active", "category", "is_sponsored_article")
     search_fields = ("title", "client_name")
     date_hierarchy = "start_date"
     

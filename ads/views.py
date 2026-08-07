@@ -7,8 +7,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .models import Advertisement, AdImpression, AdClick
-from .serializers import AdvertisementSerializer, AdInteractionSerializer
-from user.permissions import IsAdminOrStaffRole
+from .serializers import AdvertisementSerializer, AdminAdvertisementSerializer, AdInteractionSerializer
+from .permissions import CanEditAdvertisement
+from user.permissions import IsAdminRole, IsAdminOrStaffRole
+from articles.permissions import CanPublishArticle
 
 
 class AdvertisementViewSet(viewsets.ModelViewSet):
@@ -32,16 +34,15 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
             DELETE /ads/<id>/
         """
 
-        public_actions = [
-            "list",
-            "track_impression",
-            "track_click",
-            "trending",
-        ]
-
+        public_actions = ["list", "track_impression", "track_click", "trending"]
         if self.action in public_actions:
             return [permissions.AllowAny()]
-
+        if self.action == "admin_advertisements":
+            return [IsAdminRole()]
+        if self.action in ["start_review", "approve", "reject", "publish", "archive"]:
+            return [CanPublishArticle()]
+        if self.action in ["update", "partial_update", "destroy", "submit"]:
+            return [CanEditAdvertisement()]
         return [IsAdminOrStaffRole()]
 
     def get_active_queryset(self):
@@ -52,10 +53,48 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
         now = timezone.now()
 
         return Advertisement.objects.filter(
+            status=Advertisement.Status.PUBLISHED,
             is_active=True,
             start_date__lte=now,
             end_date__gte=now,
         )
+
+    def perform_create(self, serializer):
+        serializer.save(creator=self.request.user, status=Advertisement.Status.DRAFT)
+
+    def _workflow_response(self, advertisement):
+        return Response({"status": advertisement.status, "review_note": advertisement.review_note})
+
+    @action(detail=False, methods=["get"], url_path="admin/ads")
+    def admin_advertisements(self, request):
+        """Return every advertisement status for the custom admin dashboard."""
+        selected_status = request.query_params.get("status")
+        if selected_status and selected_status not in Advertisement.Status.values:
+            return Response(
+                {"status": f"Invalid status. Choose one of: {', '.join(Advertisement.Status.values)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        advertisements = Advertisement.objects.all().select_related(
+            "creator", "reviewer", "category"
+        ).annotate(
+            impression_count=Count("impressions", distinct=True),
+            click_count=Count("clicks", distinct=True),
+        )
+        if selected_status:
+            advertisements = advertisements.filter(status=selected_status)
+
+        self.search_fields = ["title", "client_name", "target_url", "creator__email", "category__name"]
+        self.ordering_fields = [
+            "title", "client_name", "status", "created_at", "updated_at", "published_at",
+            "start_date", "end_date", "impression_count", "click_count",
+        ]
+        self.ordering = ["-created_at"]
+        advertisements = self.filter_queryset(advertisements)
+        page = self.paginate_queryset(advertisements)
+        if page is not None:
+            return self.get_paginated_response(AdminAdvertisementSerializer(page, many=True).data)
+        return Response({"count": advertisements.count(), "results": AdminAdvertisementSerializer(advertisements, many=True).data})
 
     def list(self, request):
         """
@@ -138,7 +177,7 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
 
             ad = get_object_or_404(
-                Advertisement,
+                self.get_active_queryset(),
                 id=serializer.validated_data["ad_id"],
             )
 
@@ -171,7 +210,7 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
         if serializer.is_valid():
 
             ad = get_object_or_404(
-                Advertisement,
+                self.get_active_queryset(),
                 id=serializer.validated_data["ad_id"],
             )
 
@@ -193,6 +232,57 @@ class AdvertisementViewSet(viewsets.ModelViewSet):
             serializer.errors,
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    @action(detail=True, methods=["post"])
+    def submit(self, request, pk=None):
+        advertisement = self.get_object()
+        try:
+            advertisement.submit_for_review()
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return self._workflow_response(advertisement)
+
+    @action(detail=True, methods=["post"], url_path="start-review")
+    def start_review(self, request, pk=None):
+        advertisement = self.get_object()
+        try:
+            advertisement.start_review(request.user)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return self._workflow_response(advertisement)
+
+    @action(detail=True, methods=["post"])
+    def approve(self, request, pk=None):
+        advertisement = self.get_object()
+        try:
+            advertisement.approve(request.user)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return self._workflow_response(advertisement)
+
+    @action(detail=True, methods=["post"])
+    def reject(self, request, pk=None):
+        advertisement = self.get_object()
+        try:
+            advertisement.reject(request.user, request.data.get("note", ""))
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return self._workflow_response(advertisement)
+
+    @action(detail=True, methods=["post"])
+    def publish(self, request, pk=None):
+        advertisement = self.get_object()
+        try:
+            advertisement.publish(request.user)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return self._workflow_response(advertisement)
+
+    @action(detail=True, methods=["post"])
+    def archive(self, request, pk=None):
+        advertisement = self.get_object()
+        advertisement.archive(request.user)
+        return self._workflow_response(advertisement)
 
     @action(detail=False, methods=["get"], url_path="trending")
     def trending(self, request):

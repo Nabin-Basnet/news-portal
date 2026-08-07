@@ -20,6 +20,7 @@ from .serializers import (
     ArticleListSerializer,
     ArticleDetailSerializer,
     ArticleWriteSerializer,
+    AdminArticleListSerializer,
     CommentSerializer,
     ReactionSerializer,
 )
@@ -104,10 +105,20 @@ class ArticleViewSet(viewsets.ModelViewSet):
         if self.action == 'submit':
             return [IsEditorialUser()]
 
-        if self.action == 'admin_activity_dashboard':
+        if self.action in ['admin_activity_dashboard', 'admin_article_list']:
             return [IsAdmin()]
 
-        if self.action in ['add_comment', 'toggle_reaction', 'toggle_bookmark']:
+        if self.action in ['add_comment', 'update_comment', 'delete_comment', 'toggle_reaction', 'toggle_bookmark']:
+            return [permissions.IsAuthenticated()]
+
+        # ``comments`` is the action behind /articles/{id}/comments/. It
+        # supports both GET and POST, so it is not covered by the protected
+        # add_comment alias above. Keep public reads unchanged, but require
+        # authentication before a comment can be created.
+        if self.action == 'comments' and self.request.method == 'POST':
+            return [permissions.IsAuthenticated()]
+
+        if self.action == 'bookmarks':
             return [permissions.IsAuthenticated()]
 
         return [permissions.AllowAny()]
@@ -151,7 +162,15 @@ class ArticleViewSet(viewsets.ModelViewSet):
 
     # ---------------- RETRIEVE ----------------
     def retrieve(self, request, *args, **kwargs):
-        article = get_object_or_404(Article, id=kwargs[self.lookup_url_kwarg])
+        article = get_object_or_404(
+            Article.objects.annotate(
+                view_count=Count("views", distinct=True),
+                comment_count=Count("comments", distinct=True),
+                reactions_total=Count("reactions", distinct=True),
+                bookmark_count=Count("bookmarks", distinct=True),
+            ),
+            id=kwargs[self.lookup_url_kwarg],
+        )
         if article.status != Article.Status.PUBLISHED:
             role = get_role(request.user)
             allowed = request.user.is_authenticated and (
@@ -170,6 +189,18 @@ class ArticleViewSet(viewsets.ModelViewSet):
                 defaults={'ip_address': ip}
             )
 
+        article.reactions_breakdown = dict(
+            Reaction.objects.filter(article=article)
+            .values("reaction")
+            .annotate(count=Count("id"))
+            .values_list("reaction", "count")
+        )
+        article.user_has_reacted = (
+            Reaction.objects.filter(article=article, user=request.user)
+            .values_list("reaction", flat=True)
+            .first()
+            if request.user.is_authenticated else None
+        )
         comments_tree = self._comments_tree(article)
 
         serializer = self.get_serializer(article, context={
@@ -324,6 +355,8 @@ class ArticleViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get', 'post'], url_path='comments')
     def comments(self, request, pk=None):
         article = self._get_article_from_url()
+        if article.status != Article.Status.PUBLISHED:
+            return Response({"detail": "Comments are only available on published articles."}, status=status.HTTP_404_NOT_FOUND)
         if request.method == 'GET':
             return Response(self._comments_tree(article))
 
@@ -355,6 +388,25 @@ class ArticleViewSet(viewsets.ModelViewSet):
     def add_comment(self, request, pk=None):
         return self.comments(request, pk)
 
+    def _can_manage_comment(self, request, comment):
+        return comment.user_id == request.user.id or get_role(request.user) == 'admin'
+
+    def update_comment(self, request, comment_id=None):
+        comment = get_object_or_404(Comment, id=comment_id)
+        if not self._can_manage_comment(request, comment):
+            return Response({"detail": "You do not have permission to edit this comment."}, status=status.HTTP_403_FORBIDDEN)
+        serializer = CommentSerializer(comment, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete_comment(self, request, comment_id=None):
+        comment = get_object_or_404(Comment, id=comment_id)
+        if not self._can_manage_comment(request, comment):
+            return Response({"detail": "You do not have permission to delete this comment."}, status=status.HTTP_403_FORBIDDEN)
+        comment.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
     # ---------------- REACTION ----------------
     @action(detail=True, methods=['post'])
     def toggle_reaction(self, request, pk=None):
@@ -384,10 +436,35 @@ class ArticleViewSet(viewsets.ModelViewSet):
             "reaction": reaction.reaction
         }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
 
+    @action(detail=True, methods=['get'], url_path='reactions')
+    def reaction_summary(self, request, pk=None):
+        article = self._get_article_from_url()
+        if article.status != Article.Status.PUBLISHED:
+            return Response({"detail": "Reactions are only available on published articles."}, status=status.HTTP_404_NOT_FOUND)
+        breakdown = dict(
+            Reaction.objects.filter(article=article)
+            .values("reaction")
+            .annotate(count=Count("id"))
+            .values_list("reaction", "count")
+        )
+        user_reaction = (
+            Reaction.objects.filter(article=article, user=request.user)
+            .values_list("reaction", flat=True)
+            .first()
+            if request.user.is_authenticated else None
+        )
+        return Response({
+            "reactions_total": sum(breakdown.values()),
+            "reactions_breakdown": breakdown,
+            "user_has_reacted": user_reaction,
+        })
+
     # ---------------- BOOKMARK ----------------
     @action(detail=True, methods=['get', 'post'], url_path='bookmarks')
     def bookmarks(self, request, pk=None):
         article = self._get_article_from_url()
+        if article.status != Article.Status.PUBLISHED:
+            return Response({"detail": "Bookmarks are only available on published articles."}, status=status.HTTP_404_NOT_FOUND)
         if request.method == 'GET':
             bookmarked = Bookmark.objects.filter(article=article, user=request.user).exists()
             return Response({"bookmarked": bookmarked})
@@ -480,6 +557,37 @@ class ArticleViewSet(viewsets.ModelViewSet):
 
         return self._paginated_article_response(articles, ArticleListSerializer, context={"request": request})
 
+    # ---------------- ADMIN ARTICLE LIST ----------------
+    @action(detail=False, methods=["get"], url_path="admin/articles")
+    def admin_article_list(self, request):
+        """Return every workflow status for the custom admin dashboard."""
+        selected_status = request.query_params.get("status")
+        if selected_status and selected_status not in Article.Status.values:
+            return Response(
+                {"status": f"Invalid status. Choose one of: {', '.join(Article.Status.values)}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        articles = Article.objects.all().select_related("author", "category").annotate(
+            view_count=Count("views", distinct=True),
+            comment_count=Count("comments", distinct=True),
+            reaction_count=Count("reactions", distinct=True),
+            bookmark_count=Count("bookmarks", distinct=True),
+        )
+        if selected_status:
+            articles = articles.filter(status=selected_status)
+
+        # Reuse the project's globally configured SearchFilter and OrderingFilter
+        # only for this admin action, leaving public endpoint behavior unchanged.
+        self.search_fields = ["title", "summary", "body", "author_name", "author__email", "category__name"]
+        self.ordering_fields = [
+            "title", "status", "created_at", "updated_at", "published_at",
+            "view_count", "comment_count", "reaction_count", "bookmark_count",
+        ]
+        self.ordering = ["-created_at"]
+        articles = self.filter_queryset(articles)
+        return self._paginated_article_response(articles, AdminArticleListSerializer)
+
     # ---------------- ADMIN DASHBOARD ----------------
     @action(detail=False, methods=['get'])
     def admin_activity_dashboard(self, request):
@@ -513,7 +621,8 @@ class UserInteractionViewSet(viewsets.ViewSet):
     @action(detail=False, methods=['get'], url_path='bookmarks')
     def user_bookmarks(self, request):
         bookmarks = Bookmark.objects.filter(
-            user=request.user
+            user=request.user,
+            article__status=Article.Status.PUBLISHED,
         ).select_related('article', 'article__category')
 
         data = [{

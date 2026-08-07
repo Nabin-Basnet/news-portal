@@ -76,7 +76,10 @@ class CanEditArticle(permissions.BasePermission):
         if role in (ROLE_ADMIN, ROLE_EDITOR):
             return True
         if role == ROLE_REPORTER:
-            return obj.author_id == request.user.id and obj.status == obj.Status.DRAFT
+            return obj.author_id == request.user.id and obj.status in (
+                obj.Status.DRAFT,
+                obj.Status.REJECTED,
+            )
         if role == ROLE_STAFF:
             return obj.status != obj.Status.PUBLISHED and (
                 obj.author_id == request.user.id or get_role(obj.author) == ROLE_REPORTER

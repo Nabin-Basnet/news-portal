@@ -35,7 +35,9 @@ class ArticleDetailSerializer(serializers.ModelSerializer):
     author_name = serializers.SerializerMethodField()
     tags = TagSerializer(many=True, read_only=True)
     view_count = serializers.IntegerField(read_only=True)
+    comment_count = serializers.IntegerField(read_only=True)
     reactions_total = serializers.IntegerField(read_only=True)
+    bookmark_count = serializers.IntegerField(read_only=True)
     reactions_breakdown = serializers.DictField(read_only=True)
     user_has_reacted = serializers.CharField(read_only=True)
     comments = serializers.SerializerMethodField()
@@ -45,7 +47,7 @@ class ArticleDetailSerializer(serializers.ModelSerializer):
         model = Article
         fields = [
             'id', 'slug', 'title', 'summary', 'body', 'image', 'author_name', 'published_at',
-            'tags', 'view_count', 'reactions_total', 'reactions_breakdown',
+            'tags', 'view_count', 'comment_count', 'reactions_total', 'bookmark_count', 'reactions_breakdown',
             'user_has_reacted', 'comments'
         ]
 
@@ -157,6 +159,39 @@ class ArticleWriteSerializer(serializers.ModelSerializer):
 
         instance.save()
         return instance
+
+
+class AdminArticleListSerializer(serializers.ModelSerializer):
+    """Read model and aggregate data required by the custom admin article list."""
+
+    author = serializers.SerializerMethodField()
+    category = serializers.CharField(source="category.name", read_only=True, allow_null=True)
+    featured = serializers.SerializerMethodField()
+    view_count = serializers.IntegerField(read_only=True)
+    comment_count = serializers.IntegerField(read_only=True)
+    reaction_count = serializers.IntegerField(read_only=True)
+    bookmark_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Article
+        fields = [
+            "id", "title", "slug", "author", "category", "status", "featured",
+            "created_at", "updated_at", "published_at", "view_count", "comment_count",
+            "reaction_count", "bookmark_count",
+        ]
+
+    def get_author(self, obj):
+        if not obj.author_id:
+            return None
+        return {
+            "id": obj.author_id,
+            "name": obj.author_name or obj.author.full_name or obj.author.email,
+            "email": obj.author.email,
+        }
+
+    def get_featured(self, obj):
+        # The Article model currently has no persisted featured flag.
+        return False
 
 
 class CommentSerializer(serializers.ModelSerializer):

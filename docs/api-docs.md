@@ -355,13 +355,26 @@ The role is stored on the user model as a foreign key to the Role table. Public 
 - Notes:
   - Returns the authenticated reporter’s articles.
 
-### 4.16 Admin activity dashboard
+### 4.16 Admin article list
+
+- Method: `GET`
+- URL: `/api/articles/admin/articles/`
+- Access: admin only
+- Returns: every article status, paginated using the standard `count`, `next`, `previous`, and `results` response shape.
+- Optional query parameters:
+  - `status`: one of `draft`, `submitted`, `under_review`, `approved`, `published`, `rejected`, or `archived`.
+  - `search`: title, summary, body, author, or category search.
+  - `ordering`: `title`, `status`, `created_at`, `updated_at`, `published_at`, `view_count`, `comment_count`, `reaction_count`, or `bookmark_count`; prefix with `-` for descending order.
+- Each result includes status, author, category, workflow timestamps, and engagement counts.
+- `featured` is currently always `false`, because the Article model has no persisted featured field.
+
+### 4.17 Admin activity dashboard
 - Method: GET
 - URL: /articles/admin/activity/
 - Access: admin only
 - Response includes article counts, engagement counts, and categories.
 
-### 4.17 Public feeds and discovery
+### 4.18 Public feeds and discovery
 - GET /articles/feed/
   - Alias for the main published article list.
 - GET /articles/trending/
@@ -373,7 +386,7 @@ The role is stored on the user model as a foreign key to the Role table. Public 
 - GET /articles/tag/{slug}/
   - Returns published articles linked to a tag.
 
-### 4.18 Categories and tags
+### 4.19 Categories and tags
 - List categories: GET /articles/categories/
 - Create category: POST /articles/categories/
 - Retrieve/update/delete category: GET/PUT/PATCH/DELETE /articles/categories/{id}/
@@ -382,7 +395,7 @@ The role is stored on the user model as a foreign key to the Role table. Public 
 - Create/update/delete tags: POST/PUT/PATCH/DELETE /articles/tags/
 - Access for create/update/delete: staff/editor/admin
 
-### 4.19 Comments
+### 4.20 Comments
 - GET /articles/{id}/comments/
   - Get comments for an article.
 - POST /articles/{id}/comments/
@@ -403,7 +416,7 @@ The role is stored on the user model as a foreign key to the Role table. Public 
 - Notes:
   - Comments are only allowed on published articles.
 
-### 4.20 Reactions
+### 4.21 Reactions
 - POST /articles/{id}/react/
 - Body:
   ```json
@@ -416,7 +429,7 @@ The role is stored on the user model as a foreign key to the Role table. Public 
   - Reactions are only available on published articles.
   - Sending the same reaction again removes it.
 
-### 4.21 Bookmarks
+### 4.22 Bookmarks
 - GET /articles/{id}/bookmarks/
   - Returns whether the current user has bookmarked the article.
 - POST /articles/{id}/bookmark/
@@ -437,35 +450,35 @@ The role is stored on the user model as a foreign key to the Role table. Public 
   - Supports category targeting: /api/ads/?category=sports
   - The response shape is a map such as top_banner, sidebar, in_article, footer, popup.
 
-### 5.2 Create ad (admin only)
-- Method: POST
-- URL: /api/ads/
-- Access: admin only
-- Body example:
-  ```json
-  {
-    "title": "Summer campaign",
-    "client_name": "Example Co",
-    "image": "file",
-    "target_url": "https://example.com",
-    "position": "sidebar",
-    "category": 1,
-    "is_sponsored_article": false,
-    "is_active": true,
-    "start_date": "2026-07-22T00:00:00Z",
-    "end_date": "2026-08-22T00:00:00Z"
-  }
-  ```
-- Notes:
-  - For file upload, send image as form-data.
-  - If is_sponsored_article is true, sponsored_article_id must be provided.
+### 5.2 Create and edit advertisements
 
-### 5.3 Retrieve/update/delete ad
-- Methods: GET / PUT / PATCH / DELETE
-- URL: /api/ads/{id}/
-- Access: admin only
+- Create: `POST /api/ads/`
+- Update/delete: `PUT`, `PATCH`, or `DELETE /api/ads/{id}/`
+- Access: staff and admins may create; staff may edit or delete only their own draft advertisements; admins may manage any advertisement.
+- New advertisements are always created with `draft` status, regardless of client input.
+- For image upload, send multipart form-data.
 
-### 5.4 Track ad impression
+### 5.3 Advertisement workflow
+
+- `POST /api/ads/{id}/submit/`: staff owner or admin; draft/rejected ? submitted.
+- `POST /api/ads/{id}/start-review/`: editor/admin; submitted ? under_review.
+- `POST /api/ads/{id}/approve/`: editor/admin; under_review ? approved.
+- `POST /api/ads/{id}/reject/`: editor/admin; submitted/under_review/approved ? rejected. Accepts optional `note`.
+- `POST /api/ads/{id}/publish/`: editor/admin; approved ? published.
+- `POST /api/ads/{id}/archive/`: editor/admin; moves an advertisement to archived.
+
+Only `published`, active, in-schedule advertisements appear in public delivery, trending, click, and impression endpoints.
+
+### 5.4 Admin advertisement list
+
+- Method: `GET`
+- URL: `/api/ads/admin/ads/`
+- Access: admin only
+- Returns all advertisement statuses with creator, reviewer, dates, active state, click count, and impression count.
+- Optional query parameters: `status`, `search`, `ordering`, and `page`.
+- Valid status values: `draft`, `submitted`, `under_review`, `approved`, `published`, `rejected`, `archived`.
+
+### 5.5 Track ad impression
 - Method: POST
 - URL: /api/ads/impressions/
 - Access: public
@@ -476,7 +489,7 @@ The role is stored on the user model as a foreign key to the Role table. Public 
   }
   ```
 
-### 5.5 Track ad click
+### 5.6 Track ad click
 - Method: POST
 - URL: /api/ads/click/
 - Access: public
@@ -487,7 +500,7 @@ The role is stored on the user model as a foreign key to the Role table. Public 
   }
   ```
 
-### 5.6 Trending ads
+### 5.7 Trending ads
 - Method: GET
 - URL: /api/ads/trending/
 - Access: public

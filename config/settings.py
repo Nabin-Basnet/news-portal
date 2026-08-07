@@ -13,20 +13,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-# Load the project's .env explicitly from BASE_DIR so variables are reliable
+# Load the project's .env explicitly from BASE_DIR so variables are reliable.
 load_dotenv(BASE_DIR / '.env', override=True)
-try:
-    print("[settings] BASE_DIR:", BASE_DIR)
-    env_path = BASE_DIR / '.env'
-    print("[settings] .env exists:", env_path.exists())
-    try:
-        with open(env_path, 'r') as f:
-            sample = ''.join(f.readlines()[:10])
-            print("[settings] .env sample:\n" + sample)
-    except Exception as e:
-        print("[settings] couldn't read .env:", e)
-except Exception:
-    pass
 
 
 def env_value(name, default=None):
@@ -63,25 +51,22 @@ def cloudinary_from_url():
 DEBUG = env_bool("DEBUG", False)
 SECRET_KEY = env_value("SECRET_KEY")
 
-# TEMP DEBUG: print values seen by the process (remove in production)
-try:
-    print("[settings] DEBUG env:", os.getenv("DEBUG"))
-    print("[settings] SECRET_KEY present:", bool(os.getenv("SECRET_KEY")))
-except Exception:
-    pass
 if not SECRET_KEY:
     if DEBUG:
         SECRET_KEY = "django-insecure-dev-only-change-me"
     else:
         raise ImproperlyConfigured("SECRET_KEY must be set when DEBUG is False.")
 
-ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "news-portal-hvgs.onrender.com")
+default_hosts = ["news-portal-hvgs.onrender.com", "localhost", "127.0.0.1"]
+ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", ",".join(default_hosts))
 if DEBUG:
     ALLOWED_HOSTS += ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = list(dict.fromkeys(ALLOWED_HOSTS))
 
 # ---------------- INSTALLED APPS ----------------
 INSTALLED_APPS = [
     # 'cloudinary_storage',
+    'config',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -247,7 +232,7 @@ REST_FRAMEWORK = {
 
 # ---------------- PRODUCTION SECURITY ----------------
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", not DEBUG)
+SECURE_SSL_REDIRECT = env_bool("SECURE_SSL_REDIRECT", False)
 SESSION_COOKIE_SECURE = not DEBUG
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_HTTPONLY = True

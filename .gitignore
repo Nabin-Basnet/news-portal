@@ -32,3 +32,4 @@ __pycache__/
 # Build files
 build/
 dist/
+.certs/

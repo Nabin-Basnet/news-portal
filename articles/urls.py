@@ -17,6 +17,7 @@ urlpatterns = [
 
     # DASHBOARDS & WORKFLOWS
     path("admin/activity/", ArticleViewSet.as_view({"get": "admin_activity_dashboard"}), name="admin_activity_dashboard"),
+    path("admin/articles/", ArticleViewSet.as_view({"get": "admin_article_list"}), name="admin_article_list"),
     path("reporter/articles/", ArticleViewSet.as_view({"get": "list_reporter_articles"}), name="reporter_articles"),
     path("pending/", ArticleViewSet.as_view({"get": "list_pending_articles"}), name="pending_articles"),
     path("drafts/", ArticleViewSet.as_view({"get": "list_draft_articles"}), name="draft_articles"),
@@ -31,6 +32,11 @@ urlpatterns = [
     # ARTICLE CRUD (Using standardized pk lookup for DRF compatibility)
     path("create/", ArticleViewSet.as_view({"post": "create"}), name="create_article"),
     path("<int:pk>/", ArticleViewSet.as_view({"get": "retrieve"}), name="article_detail"),
+    path(
+        "comments/<int:comment_id>/",
+        ArticleViewSet.as_view({"patch": "update_comment", "delete": "delete_comment"}),
+        name="comment_detail",
+    ),
     path(
         "<int:pk>/update/",
         ArticleViewSet.as_view({"put": "update", "patch": "partial_update", "post": "partial_update"}),
@@ -52,7 +58,7 @@ urlpatterns = [
     path("<int:pk>/comment/", ArticleViewSet.as_view({"post": "add_comment"}), name="add_comment"),
     path("<int:pk>/comments/", ArticleViewSet.as_view({"get": "comments", "post": "comments"}), name="article_comments"),
     path("<int:pk>/react/", ArticleViewSet.as_view({"post": "toggle_reaction"}), name="toggle_reaction"),
-    path("<int:pk>/reactions/", ArticleViewSet.as_view({"post": "toggle_reaction"}), name="article_reactions"),
+    path("<int:pk>/reactions/", ArticleViewSet.as_view({"get": "reaction_summary", "post": "toggle_reaction"}), name="article_reactions"),
     path("<int:pk>/bookmark/", ArticleViewSet.as_view({"post": "toggle_bookmark"}), name="toggle_bookmark"),
     path("<int:pk>/bookmarks/", ArticleViewSet.as_view({"get": "bookmarks", "post": "bookmarks"}), name="article_bookmarks"),
     path("my-bookmarks/", UserInteractionViewSet.as_view({"get": "user_bookmarks"}), name="my_bookmarks"),
